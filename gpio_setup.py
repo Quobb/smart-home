@@ -9,7 +9,7 @@ GPIO.setwarnings(False)
 GPIO.setup(PIN_SERVO, GPIO.OUT)
 GPIO.setup(PIN_LIGHT, GPIO.OUT, initial=GPIO.LOW)
 GPIO.setup(PIN_BUZZER, GPIO.OUT, initial=GPIO.LOW)
-GPIO.setup(PIN_BUZZER2, GPIO.OUT, initial=GPIO.LOW)
+GPIO.setup(PIN_BUZZER_2, GPIO.OUT, initial=GPIO.LOW)
 
 # PIR
 GPIO.setup(PIN_PIR1, GPIO.IN, pull_up_down=GPIO.PUD_DOWN)

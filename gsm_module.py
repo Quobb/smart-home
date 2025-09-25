@@ -40,3 +40,6 @@ def send_sms(text, recipients=ALERT_PHONE_NUMBERS):
             log_event(f"SMS sent to {number}")
         except Exception as e:
             log_event(f"SMS error {number}: {e}")
+
+
+send_sms("hello",ALERT_PHONE_NUMBERS)
