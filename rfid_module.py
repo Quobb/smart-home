@@ -1,48 +1,59 @@
-from time import sleep
-from actuators import servo_open, servo_close
-from camera_module import capture_image
-from utils import log_event
 from mfrc522 import SimpleMFRC522
+from utils import log_event
+import time
+from threading import Timer
 
-# Store UIDs as strings for consistency
+# Import from main to avoid circular import
+import main
+
+rfid_reader = SimpleMFRC522()
 RFID_WHITELIST = {}
 
-try:
-    rfid_reader = SimpleMFRC522()
-except Exception as e:
-    log_event(f"RFID init failed: {e}")
-    rfid_reader = None
-
-
 def normalize_uid(uid):
-    """Convert UID (int) to string for storage/lookup."""
-    return str(uid)
-
+    """Convert UID to consistent string format"""
+    return str(uid).strip()
 
 def handle_rfid():
-    if not rfid_reader:
-        log_event("RFID unavailable")
-        return
-
-    log_event("RFID reader ready...")
-
+    """Monitor RFID reader for card scans"""
+    log_event("RFID monitoring started")
+    
     while True:
         try:
-            # Blocking read until card is detected
-            card_id, _ = rfid_reader.read()
+            log_event("Waiting for RFID card...")
+            card_id, text = rfid_reader.read()  # This blocks until card is detected
             uid_str = normalize_uid(card_id)
-
-            name = RFID_WHITELIST.get(uid_str)
-            if name:
-                log_event(f"RFID Authorized: {name}")
-                servo_open()
-                sleep(3)
-                servo_close()
+            
+            if uid_str in RFID_WHITELIST:
+                user_name = RFID_WHITELIST[uid_str]
+                log_event(f"✅ Authorized RFID: {user_name} ({uid_str})")
+                
+                # Set authorized user status
+                main.set_authorized_user(user_name)
+                
+                # Auto-logout after 8 hours (28800 seconds)
+                def auto_logout():
+                    main.clear_authorized_user()
+                    log_event(f"Auto-logout: {user_name} session expired")
+                
+                Timer(28800, auto_logout).start()
+                
             else:
-                log_event(f"RFID Unauthorized: {uid_str}")
-                capture_image("rfid_unauth")
-
-            sleep(1)  # avoid hammering the reader
+                log_event(f"❌ Unauthorized RFID: {uid_str}")
+                # Still trigger security measures for unknown cards
+                from actuators import buzzer_on, buzzer_off
+                from camera_module import capture_image
+                from gsm_module import send_sms, send_image_mms
+                
+                buzzer_on()
+                image_path = capture_image("unauthorized_rfid")
+                send_sms(f"SECURITY ALERT: Unauthorized RFID card detected at {time.strftime('%Y-%m-%d %H:%M:%S')}")
+                if image_path:
+                    send_image_mms(image_path, "Unauthorized RFID attempt")
+                
+                Timer(5, buzzer_off).start()
+            
+            time.sleep(2)  # Prevent rapid re-reads
+            
         except Exception as e:
-            log_event(f"RFID read error: {e}")
-            sleep(1)
+            log_event(f"RFID error: {e}")
+            time.sleep(1)
